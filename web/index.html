@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoIP Lab - Two Client Demo</title>
+    <style>
+      :root {
+        --bg-0: #050814;
+        --bg-1: #0a1220;
+        --panel: rgba(10, 16, 29, 0.9);
+        --panel-border: rgba(148, 163, 184, 0.18);
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --cyan: #67e8f9;
+        --green: #34d399;
+        --amber: #fbbf24;
+        --red: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(103, 232, 249, 0.16),
+            transparent 28%
+          ),
+          radial-gradient(
+            circle at bottom right,
+            rgba(52, 211, 153, 0.14),
+            transparent 28%
+          ),
+          linear-gradient(145deg, var(--bg-1) 0%, #0b1526 48%, var(--bg-0) 100%);
+        padding: 24px;
+      }
+
+      .shell {
+        width: min(1200px, 100%);
+        margin: 0 auto;
+      }
+
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-start;
+        margin-bottom: 20px;
+      }
+
+      .eyebrow {
+        color: var(--cyan);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3.6rem);
+        line-height: 1.03;
+        max-width: 12ch;
+      }
+
+      .lead {
+        margin: 12px 0 0;
+        max-width: 72ch;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 1rem;
+      }
+
+      .pill {
+        align-self: flex-start;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--muted);
+        font-size: 0.9rem;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+
+      .start-panel,
+      .status-panel,
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(16px);
+      }
+
+      .start-panel {
+        margin-top: 18px;
+        border-radius: 24px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .status-panel {
+        margin-top: 18px;
+        border-radius: 20px;
+        padding: 16px 18px;
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .status-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.14);
+        flex: 0 0 auto;
+      }
+
+      #status-msg {
+        margin: 0;
+        font-size: 1rem;
+        color: var(--amber);
+      }
+
+      .grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        border-radius: 24px;
+        padding: 18px;
+        overflow: hidden;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .card-header h2 {
+        margin: 0;
+        font-size: 1.22rem;
+        line-height: 1.2;
+      }
+
+      .card-header p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      .badge {
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .badge.live {
+        background: rgba(52, 211, 153, 0.14);
+        color: #86efac;
+      }
+
+      .badge.delay {
+        background: rgba(251, 191, 36, 0.14);
+        color: #fde68a;
+      }
+
+      video,
+      canvas {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 18px;
+        background: #020617;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      video {
+        object-fit: cover;
+      }
+
+      #local-video {
+        transform: scaleX(-1);
+      }
+
+      .controls {
+        margin-top: 14px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: none;
+        border-radius: 14px;
+        padding: 12px 16px;
+        font-size: 0.96rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          opacity 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+        transform: none;
+      }
+
+      .primary {
+        background: linear-gradient(135deg, #67e8f9, #34d399);
+        color: #05121d;
+        box-shadow: 0 12px 30px rgba(52, 211, 153, 0.18);
+      }
+
+      .secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+      }
+
+      .helper {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 0.92rem;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 920px) {
+        .hero,
+        .start-panel {
+          flex-direction: column;
+        }
+
+        .pill {
+          align-self: flex-start;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 16px;
+        }
+
+        .start-panel,
+        .card,
+        .status-panel {
+          border-radius: 20px;
+        }
+
+        .controls {
+          flex-direction: column;
+        }
+
+        button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <div class="eyebrow">WebRTC Lab</div>
+          <h1>Two clients, one delayed call.</h1>
+          <p class="lead">
+            Open this page in two tabs. The first tab becomes Client 1 and the
+            second becomes Client 2. Remote audio and video are intentionally
+            delayed by 3 seconds so the behavior is easy to observe in class.
+          </p>
+        </div>
+        <div class="pill" id="connection-pill">Disconnected</div>
+      </section>
+
+      <section class="start-panel" id="start-panel">
+        <button id="join-btn" class="primary">Join room</button>
+        <p class="helper">
+          No password, no extra setup, no manual server input. Just open two
+          tabs and press Join in each one.
+        </p>
+      </section>
+
+      <section class="status-panel">
+        <div class="status-row">
+          <span class="status-dot"></span>
+          <h3 id="status-msg">Waiting for the first client to join...</h3>
+        </div>
+      </section>
+
+      <section id="session-screen" class="hidden">
+        <div class="grid">
+          <article class="card" id="local-card">
+            <div class="card-header">
+              <div>
+                <h2 id="local-title">Client 1 - You</h2>
+                <p id="local-subtitle">Your live camera and microphone.</p>
+              </div>
+              <span class="badge live">Live</span>
+            </div>
+            <video id="local-video" autoplay playsinline muted></video>
+            <div class="controls">
+              <button id="mute-btn" class="secondary">Mute microphone</button>
+              <button id="camera-btn" class="secondary">Turn off camera</button>
+              <button id="blur-btn" class="secondary" disabled>
+                Blur camera
+              </button>
+              <button id="noise-btn" class="secondary" disabled>
+                Noise suppression
+              </button>
+            </div>
+            <p class="helper">
+              These two controls are intentionally disabled for now. TODO 6 will
+              turn them into real camera and voice effects.
+            </p>
+          </article>
+
+          <article class="card" id="remote-card">
+            <div class="card-header">
+              <div>
+                <h2 id="remote-title">Client 2 - Delayed preview</h2>
+                <p id="remote-subtitle">
+                  Audio and video appear 3 seconds late.
+                </p>
+              </div>
+              <span class="badge delay">3s delay</span>
+            </div>
+            <canvas id="remote-canvas"></canvas>
+            <video
+              id="remote-source-video"
+              class="hidden"
+              autoplay
+              playsinline
+              muted
+            ></video>
+            <p class="helper">
+              The muted button only affects the local microphone in this tab.
+              The other client keeps hearing and seeing the source normally, but
+              with a 3-second delay in the remote panel.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="main.js"></script>
+  </body>
+</html>
