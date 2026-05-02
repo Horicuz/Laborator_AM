@@ -1,0 +1,28 @@
+# Laborator 9 - VoIP si Conferinta
+# Instalare: pip install -r requirements.txt
+
+# Server de signaling WebRTC
+websockets>=11.0
+
+# Server de procesare audio/video
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+
+# Procesare imagine/video
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Procesare semnal audio
+scipy>=1.11.0
+
+# Captura si redare audio (pentru udp_sender / udp_receiver)
+sounddevice>=0.4.6
+
+# audioop a fost eliminat din Python 3.13  folosim backport-ul
+# audioop-lts>=0.2.1
+
+# Notebook Jupyter
+jupyter>=1.0.0
+ipywidgets>=8.0.0
+matplotlib>=3.7.0
+plotly>=5.15.0
