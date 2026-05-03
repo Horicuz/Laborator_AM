@@ -3,14 +3,15 @@
 import http.server
 import socket
 import socketserver
+from pathlib import Path
 
 PORT = 4321
-DIRECTORY = "web"
+_WEB_ROOT = Path(__file__).resolve().parent.parent.parent / "web"
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=DIRECTORY, **kwargs)
+        super().__init__(*args, directory=str(_WEB_ROOT), **kwargs)
 
     def log_message(self, fmt, *args):
         pass  # suppress per-request logs

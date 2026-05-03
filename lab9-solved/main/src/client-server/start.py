@@ -5,10 +5,12 @@ Works on Windows (Conda), macOS and Linux.
 Usage:
     python start.py
 """
-
+import os
 import subprocess
 import sys
 import time
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 SERVERS = [
     ("Signaling server  (ws://localhost:9999)", ["signaling_server.py"]),
@@ -23,7 +25,7 @@ def main():
     print("Starting Lab 9 servers...\n")
 
     for label, args in SERVERS:
-        p = subprocess.Popen([sys.executable] + args)
+        p = subprocess.Popen([sys.executable] + args, cwd=SCRIPT_DIR)
         processes.append(p)
         print(f"  {label}")
         time.sleep(0.8)
