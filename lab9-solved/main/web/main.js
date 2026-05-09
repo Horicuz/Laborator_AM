@@ -228,8 +228,14 @@ async function handleSignalingMessage(data) {
 
     case "kicked":
       log("Ai fost eliminat din camera!", "error");
+      leaveRoom();
       setStatus("Eliminat din camera", "#f44336");
-      cleanup();
+      break;
+
+    case "promoted_to_admin":
+      isAdmin = true;
+      log("Esti noul admin al camerei");
+      document.getElementById("kickControls").style.display = "block";
       break;
 
     case "error":

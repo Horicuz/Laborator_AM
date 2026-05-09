@@ -214,8 +214,13 @@ async def handler(websocket: websockets.WebSocketServerProtocol):
             if admins.get(current_room) == peer_id:
                 remaining = list(rooms[current_room].keys())
                 if remaining:
-                    admins[current_room] = remaining[0]
-                    log.info(f"Admin nou in '{current_room}': {admins[current_room]}")
+                    new_admin_id = remaining[0]
+                    admins[current_room] = new_admin_id
+                    log.info(f"Admin nou in '{current_room}': {new_admin_id}")
+                    await send_json(
+                        rooms[current_room][new_admin_id],
+                        {"type": "promoted_to_admin"},
+                    )
                 else:
                     del admins[current_room]
 

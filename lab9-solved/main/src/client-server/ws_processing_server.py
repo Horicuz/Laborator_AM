@@ -79,9 +79,9 @@ def apply_video_filter(image: np.ndarray, filter_name: str) -> np.ndarray:
         return cv2.bitwise_and(color, edges_bgr)
 
     elif filter_name == "sepia":
-        # Matrice de transformare sepia
+        # Kernel sepia adaptat pentru BGR (coloanele R si B inversate fata de RGB standard)
         kernel = np.array(
-            [[0.272, 0.534, 0.131], [0.349, 0.686, 0.168], [0.393, 0.769, 0.189]]
+            [[0.131, 0.534, 0.272], [0.168, 0.686, 0.349], [0.189, 0.769, 0.393]]
         )
         sepia = cv2.transform(image.astype(np.float32), kernel)
         return np.clip(sepia, 0, 255).astype(np.uint8)
