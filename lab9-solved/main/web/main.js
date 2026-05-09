@@ -37,10 +37,13 @@ const PC_CONFIG = {
 let signalingWs  = null;    // WebSocket catre serverul de signaling
 let processingWs = null;    // WebSocket catre serverul de procesare
 
-let myId         = null;
-let isAdmin      = false;
-let localStream  = null;
-let filteredStream = null;
+let myId               = null;
+let isAdmin            = false;
+let localStream        = null;
+let filteredStream     = null;
+let filteredAudioStream = null;  // audio procesat de server -> track WebRTC
+let audioContext       = null;
+let processedAudioQueue = [];    // Float32Array chunks primite de la server
 let roomId       = null;
 let isMuted      = false;
 
@@ -242,8 +245,9 @@ async function handleSignalingMessage(data) {
 function createPeerConnection(peerId) {
   const pc = new RTCPeerConnection(PC_CONFIG);
 
-  // Ambele track-uri asociate cu localStream  remote-ul le vede in acelasi stream  audio + video functioneaza
-  const audioTrack = localStream.getAudioTracks()[0];
+  // Audio: track procesat de server (cu filtru activ); fallback la raw daca serverul nu e gata
+  // Video: canvas procesat (filteredStream) sau raw
+  const audioTrack = (filteredAudioStream ?? localStream).getAudioTracks()[0];
   const videoTrack = (filteredStream ?? localStream).getVideoTracks()[0];
   if (audioTrack) pc.addTrack(audioTrack, localStream);
   if (videoTrack) pc.addTrack(videoTrack, localStream);
@@ -393,10 +397,12 @@ function connectProcessingServer() {
 
   processingWs.onopen = () => {
     log("Conectat la serverul de procesare audio/video");
+    setupAudioProcessing();
   };
 
   processingWs.onmessage = (event) => {
     const data = JSON.parse(event.data);
+
     if (data.type === "video_frame") {
       // Desenam frame-ul procesat pe canvas
       const img = new Image();
@@ -406,12 +412,81 @@ function connectProcessingServer() {
         const ctx    = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       };
+
+    } else if (data.type === "audio_chunk") {
+      // Decodam PCM int16 primit de la server si il punem in coada de redare
+      const bin   = atob(data.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const int16   = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
+      processedAudioQueue.push(float32);
     }
   };
 
   processingWs.onerror = () => {
     log("Eroare la serverul de procesare (ruleaza ws_processing_server.py?)", "warn");
   };
+}
+
+function setupAudioProcessing() {
+  if (!localStream || audioContext) return;
+
+  audioContext = new AudioContext({ sampleRate: 44100 });
+  const source = audioContext.createMediaStreamSource(localStream);
+
+  // Nod de captura: trimite chunk-uri PCM int16 catre server
+  const captureNode = audioContext.createScriptProcessor(4096, 1, 1);
+  captureNode.onaudioprocess = (event) => {
+    if (processingWs?.readyState !== WebSocket.OPEN) return;
+    const samples = event.inputBuffer.getChannelData(0);
+    const int16   = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      int16[i] = Math.max(-32768, Math.min(32767, samples[i] * 32768));
+    }
+    const bytes = new Uint8Array(int16.buffer);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    processingWs.send(JSON.stringify({
+      type:        "audio_chunk",
+      data:        btoa(bin),
+      sample_rate: audioContext.sampleRate
+    }));
+  };
+
+  // Conectam sursa -> captureNode; sink silentios pentru a mentine graful activ
+  const silentSink = audioContext.createGain();
+  silentSink.gain.value = 0;
+  source.connect(captureNode);
+  captureNode.connect(silentSink);
+  silentSink.connect(audioContext.destination);
+
+  // Nod de redare: scoate audio procesat din coada catre track-ul WebRTC
+  const playbackNode = audioContext.createScriptProcessor(4096, 1, 1);
+  playbackNode.onaudioprocess = (event) => {
+    const out = event.outputBuffer.getChannelData(0);
+    if (processedAudioQueue.length > 0) {
+      const chunk = processedAudioQueue.shift();
+      const len   = Math.min(chunk.length, out.length);
+      for (let i = 0; i < len; i++) out[i] = chunk[i];
+      for (let i = len; i < out.length; i++) out[i] = 0;
+    } else {
+      out.fill(0);
+    }
+  };
+
+  // MediaStreamDestinationNode capteaza audio-ul procesat pentru WebRTC
+  const destination = audioContext.createMediaStreamDestination();
+  playbackNode.connect(destination);
+  // Sink silentios pentru a tine playbackNode activ in graf
+  const playSilent = audioContext.createGain();
+  playSilent.gain.value = 0;
+  playbackNode.connect(playSilent);
+  playSilent.connect(audioContext.destination);
+
+  filteredAudioStream = destination.stream;
+  log("Pipeline audio initializat - filtrele de voce sunt active");
 }
 
 // Filtrul video se aplica client-side pe canvas  fara round-trip la server
@@ -577,6 +652,9 @@ function cleanup() {
   if (processingWs)   processingWs.close();
   if (localStream)    localStream.getTracks().forEach(t => t.stop());
   if (filteredStream) { filteredStream.getTracks().forEach(t => t.stop()); filteredStream = null; }
+  if (audioContext)   { audioContext.close(); audioContext = null; }
+  filteredAudioStream = null;
+  processedAudioQueue = [];
   localStream = null;
   isMuted = false;
 }
